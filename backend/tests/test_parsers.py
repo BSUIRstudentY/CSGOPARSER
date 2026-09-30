@@ -59,22 +59,31 @@ async def test_skinport_html_challenge_is_an_error() -> None:
 
 
 @pytest.mark.asyncio
-async def test_dmarket_cents_and_offer_counts() -> None:
+async def test_dmarket_cents_and_offer_counts(monkeypatch: pytest.MonkeyPatch) -> None:
+    from nacl.signing import SigningKey
+
+    key = SigningKey.generate()
+    monkeypatch.setenv("DMARKET_PUBLIC_KEY", bytes(key.verify_key).hex())
+    monkeypatch.setenv("DMARKET_SECRET_KEY", key.encode().hex())
+
     def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/marketplace-api/v2/offers"
         assert request.url.params["gameId"] == "a8db"
+        assert request.url.params["limit"] == "100"
+        assert request.headers["x-request-sign"].startswith("dmar ed25519 ")
         return httpx.Response(
             200,
             json={
-                "objects": [
+                "items": [
                     {
-                        "title": "AWP | Asiimov (Field-Tested)",
-                        "price": {"USD": "6200"},
-                        "itemId": "a",
+                        "offerId": "a",
+                        "priceCents": 6200,
+                        "attributes": {"title": "AWP | Asiimov (Field-Tested)"},
                     },
                     {
-                        "title": "AWP | Asiimov (Field-Tested)",
-                        "price": {"USD": "6400"},
-                        "itemId": "b",
+                        "offerId": "b",
+                        "priceCents": 6400,
+                        "attributes": {"title": "AWP | Asiimov (Field-Tested)"},
                     },
                 ],
                 "cursor": "",
@@ -82,10 +91,23 @@ async def test_dmarket_cents_and_offer_counts() -> None:
         )
 
     async with _client(handler) as client:
-        rows = await DMarketParser().fetch(_ctx("dmarket"), client)
+        rows = await DMarketParser().fetch(
+            _ctx("dmarket", "https://api.dmarket.com"),
+            client,
+        )
     assert len(rows) == 1
     assert rows[0].price == Decimal("62")
     assert rows[0].listings_count == 2
+
+
+@pytest.mark.asyncio
+async def test_dmarket_requires_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("DMARKET_PUBLIC_KEY", raising=False)
+    monkeypatch.delenv("DMARKET_SECRET_KEY", raising=False)
+
+    async with _client(lambda request: httpx.Response(200, json={})) as client:
+        with pytest.raises(ParserError, match="DMARKET_PUBLIC_KEY"):
+            await DMarketParser().fetch(_ctx("dmarket", "https://api.dmarket.com"), client)
 
 
 @pytest.mark.asyncio

@@ -44,14 +44,14 @@ All five clients call documented public HTTP APIs. None of them bypass Cloudflar
 | Slug | Source | Default seller fee | Trade lock | Cash out |
 | --- | --- | --- | --- | --- |
 | `skinport` | `GET /v1/items` (Brotli, 8 requests / 5 min) | 12% | 0 | yes |
-| `dmarket` | `GET /exchange/v1/market/items` (`gameId=a8db`, prices in cents) | 7% | 0 | yes |
+| `dmarket` | Signed `GET /marketplace-api/v2/offers` (`gameId=a8db`, prices in cents, 25 pages) | 7% | 0 | yes |
 | `waxpeer` | `GET /v1/prices?game=csgo` (`1000` = $1) | 2% | 0 | yes |
 | `steam` | Community Market search JSON, `currency=1` | 13.04% of the buyer price | 7 days | no |
 | `market_csgo` | `GET /api/v2/prices/USD.json` | 5% | 7 days | yes |
 
 Buff and CS.MONEY are not included. Buff’s public surface is not a stable official price API, and CS.MONEY does not publish a bulk price feed this client can call without scraping. Add one only if you have a permitted source. See below.
 
-DMarket and Steam are capped (`max_pages`) so the first live sync stays small. Raise the cap in the site `config` JSON from Admin.
+DMarket reads 25 pages (100 offers each) from the signed offers API. Steam stays partial at `max_pages` 2 until a separate decision. Change either cap in the site `config` JSON from Admin.
 
 Confirm every fee on the marketplace before you trade. The numbers above are editable defaults.
 

@@ -23,6 +23,7 @@ dependencies = [
   "bcrypt>=4.2",
   "pyjwt>=2.10",
   "python-multipart>=0.0.17",
+  "pynacl>=1.5",
 ]
 
 [project.optional-dependencies]

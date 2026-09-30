@@ -77,18 +77,20 @@ DEFAULT_SITES: list[dict[str, Any]] = [
         "enabled": True,
         "tos_restricted": False,
         "payment_methods": ["balance", "card", "crypto"],
+        "secret_env": "DMARKET_SECRET_KEY",
         "config": {
             "game_id": "a8db",
-            "max_pages": 3,
+            "max_pages": 25,
             "page_limit": 100,
             "min_interval_seconds": 60,
-            "timeout_seconds": 30,
-            "items_url": "https://api.dmarket.com/exchange/v1/market/items",
+            "timeout_seconds": 45,
         },
         "notes": (
-            "Official public market items API. Prices are integer cents. "
-            "gameId a8db is CS2. Default seller fee is 7%; confirm it in DMarket before trading. "
-            "max_pages caps the first sync so a full catalog is opt-in."
+            "Official marketplace-api/v2/offers. Prices are integer cents. "
+            "gameId a8db is CS2. Requires DMARKET_PUBLIC_KEY and DMARKET_SECRET_KEY; "
+            "the old unsigned /exchange/v1/market/items route is retired. "
+            "Default seller fee is 7%; confirm it in DMarket before trading. "
+            "max_pages is 25 (2,500 offers). Steam stays smaller until a separate decision."
         ),
     },
     {
@@ -139,7 +141,8 @@ DEFAULT_SITES: list[dict[str, Any]] = [
         },
         "notes": (
             "Community Market search JSON (currency=1, USD), not a partner price API. "
-            "Keep max_pages low. sell_price is the buyer-facing price, so buy_fee is 0. "
+            "Partial on purpose: max_pages stays at 2 until a separate decision to widen it. "
+            "sell_price is the buyer-facing price, so buy_fee is 0. "
             "A sale returns about 86.96% to the Steam wallet (13.04% combined fee) and "
             "that balance cannot be withdrawn as cash. Purchased items are trade-locked for 7 days."
         ),
@@ -218,6 +221,7 @@ async def _seed_sites(session: AsyncSession) -> list[Site]:
             tos_restricted=spec["tos_restricted"],
             payment_methods=list(spec["payment_methods"]),
             config=dict(spec["config"]),
+            secret_env=spec.get("secret_env"),
             notes=spec["notes"],
         )
         session.add(site)

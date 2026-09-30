@@ -18,6 +18,7 @@ Requires-Dist: structlog>=24.4
 Requires-Dist: bcrypt>=4.2
 Requires-Dist: pyjwt>=2.10
 Requires-Dist: python-multipart>=0.0.17
+Requires-Dist: pynacl>=1.5
 Provides-Extra: dev
 Requires-Dist: pytest>=8.3; extra == "dev"
 Requires-Dist: pytest-asyncio>=0.24; extra == "dev"

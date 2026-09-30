@@ -11,6 +11,7 @@ app/api/routes/admin.py
 app/api/routes/arbitrage.py
 app/api/routes/auth.py
 app/api/routes/items.py
+app/api/routes/market.py
 app/api/routes/sites.py
 app/api/routes/users.py
 app/core/__init__.py
@@ -32,6 +33,7 @@ app/services/cycle.py
 app/services/demo_data.py
 app/services/fx.py
 app/services/ingest.py
+app/services/links.py
 app/services/normalization.py
 app/services/opportunities.py
 app/services/parsers/__init__.py

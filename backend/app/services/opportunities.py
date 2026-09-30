@@ -69,6 +69,9 @@ async def recompute_opportunities(session: AsyncSession, min_profit_pct: Decimal
                 )
                 if breakdown.profit_pct < floor:
                     continue
+                # profit_pct is Numeric(10, 4). Penny buys against a high ask overflow it.
+                if breakdown.profit_pct.copy_abs() >= Decimal("1000000"):
+                    continue
                 lock_days = buy_site.trade_lock_days
                 pending.append(
                     ArbitrageOpportunity(
@@ -93,10 +96,12 @@ async def recompute_opportunities(session: AsyncSession, min_profit_pct: Decimal
                     )
                 )
                 written += 1
-                if len(pending) >= 500:
+                if len(pending) >= 400:
                     session.add_all(pending)
+                    await session.flush()
                     pending = []
     if pending:
         session.add_all(pending)
+        await session.flush()
     await session.commit()
     return written
