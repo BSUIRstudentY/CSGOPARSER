@@ -64,6 +64,8 @@ class PricePointOut(BaseModel):
     listings_count: int | None
     volume_24h: int | None
     captured_at: datetime
+    # Highest buy order. Empty on older ask-only rows.
+    bid_usd: float | None = None
 
 
 class ListingSearchOut(BaseModel):

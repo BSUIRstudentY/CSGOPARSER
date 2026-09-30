@@ -1,4 +1,10 @@
-"""Price comparison across marketplaces. One row is one skin, not a buy/sell route."""
+"""Demand comparison across marketplaces. One row is one skin, not a buy/sell route.
+
+Each quote is the highest buy order (what that market will pay), not the cheapest listing.
+Sites with no stored bid are left out. Arbitrage still uses asks.
+"""
+
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
@@ -16,6 +22,20 @@ router = APIRouter(prefix="/market", tags=["market"])
 def _like(value: str) -> str:
     escaped = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     return f"%{escaped}%"
+
+
+def demand_usd(price: Price) -> float | None:
+    """Highest buy order in USD. Missing or non-positive bids are not a demand quote."""
+    raw = (price.details or {}).get("bid_usd")
+    if raw is None:
+        return None
+    try:
+        value = Decimal(str(raw))
+    except (ArithmeticError, ValueError):
+        return None
+    if value <= 0:
+        return None
+    return money(value)
 
 
 def _card(item: Item, quotes: list[QuoteOut]) -> MarketCardOut | None:
@@ -73,11 +93,14 @@ async def _cards(
     rows = (await db.execute(stmt)).all()
     grouped: dict[int, tuple[Item, list[QuoteOut]]] = {}
     for price, item, site in rows:
+        bid = demand_usd(price)
+        if bid is None:
+            continue
         quote = QuoteOut(
             site=site.slug,
             site_name=site.name,
-            price_usd=money(price.price_usd),
-            listings_count=price.listings_count,
+            price_usd=bid,
+            listings_count=None,
             url=listing_url(site.slug, item.canonical_name, price.details),
         )
         bucket = grouped.get(item.id)

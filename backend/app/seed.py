@@ -111,8 +111,9 @@ DEFAULT_SITES: list[dict[str, Any]] = [
         "payment_methods": ["balance", "crypto"],
         "config": {"game": "csgo", "min_interval_seconds": 300, "timeout_seconds": 120},
         "notes": (
-            "Official public price list GET /v1/prices?game=csgo. "
-            "The min field is thousandths of a dollar (1000 = $1). "
+            "Asks: GET /v1/prices?game=csgo. Demand: GET /v1/buy-orders/snapshot. "
+            "Both prices are thousandths of a dollar (1000 = $1). The market page uses "
+            "the snapshot max, which is the highest buy order. "
             "Default seller fee is 2%; confirm the current Waxpeer commission."
         ),
     },
@@ -163,9 +164,12 @@ DEFAULT_SITES: list[dict[str, Any]] = [
         "enabled": True,
         "tos_restricted": False,
         "payment_methods": ["balance", "card"],
-        "config": {"min_interval_seconds": 300, "timeout_seconds": 60},
+        "config": {"min_interval_seconds": 300, "timeout_seconds": 180},
         "notes": (
-            "Official public price export GET /api/v2/prices/USD.json. "
+            "Demand comes from GET /api/v2/prices/class_instance/USD.json. "
+            "buy_order is the maximum buy order on that class instance. "
+            "The stored bid is the highest one that does not exceed the cheapest ask "
+            "for the market hash name. "
             "Default seller commission is 5%. Purchases settled by a Steam trade are often "
             "locked for 7 days; set trade_lock_days to 0 if you only count tradable stock."
         ),

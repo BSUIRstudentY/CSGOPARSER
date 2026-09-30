@@ -105,13 +105,15 @@ def listings_for_site(slug: str, tick: int = 0) -> list[Listing]:
         )
         parsed = parse_market_hash_name(name)
         assert parsed is not None
+        price = quote(Decimal(base_raw), slug, index, tick)
         rows.append(
             Listing(
                 raw_name=name,
-                price=quote(Decimal(base_raw), slug, index, tick),
+                price=price,
                 currency="USD",
                 listings_count=12 + (index * 3) % 40,
                 volume_24h=4 + index % 15,
+                bid=(price * Decimal("0.93")).quantize(Decimal("0.01")),
                 metadata={"source": "demo"},
             )
         )

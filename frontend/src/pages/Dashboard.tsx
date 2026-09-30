@@ -53,8 +53,12 @@ export function DashboardPage() {
       <div>
         <h1 className="text-xl font-medium">Маркет</h1>
         <p className="mt-1 text-sm text-muted">
-          Один и тот же скин на разных площадках. Сверху те, у которых больше разница между самой
-          низкой и самой высокой ценой.
+          Один и тот же скин на разных площадках. Сравниваем спрос: лучшую заявку на покупку, а не
+          самый дешёвый лот. Сверху те, у кого заявки расходятся сильнее.
+        </p>
+        <p className="mt-1 text-sm text-muted">
+          Skinport и Steam не отдают общий список заявок. DMarket отдаёт спрос только с ключами
+          API, поэтому их нет в сравнении, пока заявка не записана.
         </p>
       </div>
       <section className="grid gap-3 sm:grid-cols-3">
@@ -163,7 +167,7 @@ export function DashboardPage() {
       </div>
       {!loading && rows && rows.items.length === 0 && (
         <p className="rounded border border-line px-3 py-8 text-center text-sm text-muted">
-          Нет скинов с ценами хотя бы на двух площадках.
+          Нет скинов со спросом хотя бы на двух площадках.
         </p>
       )}
       <div className="flex items-center justify-between text-sm text-muted">

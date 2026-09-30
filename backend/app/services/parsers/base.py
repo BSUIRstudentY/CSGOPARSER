@@ -21,6 +21,8 @@ class Listing:
     external_id: str | None = None
     # True when listings_count is already the market total. False when each row is one offer.
     count_is_total: bool = True
+    # Highest buy order (demand). price stays the cheapest ask (supply).
+    bid: Decimal | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -43,14 +45,19 @@ class MarketplaceParser(Protocol):
 
 
 def aggregate_listings(listings: list[Listing]) -> list[Listing]:
-    """Collapse duplicate names to the cheapest ask and a single listing count."""
+    """Collapse duplicate names to the cheapest ask and the highest buy order."""
     grouped: dict[str, Listing] = {}
     counts: dict[str, int] = {}
     totals: dict[str, bool] = {}
+    bids: dict[str, Decimal] = {}
     for row in listings:
         name = " ".join(row.raw_name.split())
         if not name or row.price <= 0:
             continue
+        if row.bid is not None and row.bid > 0:
+            current_bid = bids.get(name)
+            if current_bid is None or row.bid > current_bid:
+                bids[name] = row.bid
         piece = row.listings_count if row.listings_count is not None else 1
         if name not in counts:
             counts[name] = piece
@@ -70,11 +77,14 @@ def aggregate_listings(listings: list[Listing]) -> list[Listing]:
                 volume_24h=row.volume_24h,
                 external_id=row.external_id,
                 count_is_total=True,
+                bid=row.bid,
                 metadata=dict(row.metadata),
             )
     result: list[Listing] = []
     for name, row in grouped.items():
         row.listings_count = counts[name]
+        if name in bids:
+            row.bid = bids[name]
         result.append(row)
     return result
 

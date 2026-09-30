@@ -88,9 +88,14 @@ async def ingest_listings(
             continue
         previous = latest.get(item.id)
         count = listing.listings_count
-        if previous is not None and _same_quote(previous, usd, count):
+        bid_usd = _bid_usd(listing, rates)
+        if previous is not None and _same_quote(previous, usd, count, bid_usd):
             stats.skipped_unchanged += 1
             continue
+        details = {k: v for k, v in listing.metadata.items() if v is not None}
+        if listing.bid is not None and listing.bid > 0 and bid_usd is not None:
+            details["bid"] = format(listing.bid, "f")
+            details["bid_usd"] = format(bid_usd, "f")
         price = Price(
             item_id=item.id,
             site_id=site.id,
@@ -100,7 +105,7 @@ async def ingest_listings(
             listings_count=count,
             volume_24h=listing.volume_24h,
             captured_at=when,
-            details={k: v for k, v in listing.metadata.items() if v is not None},
+            details=details,
         )
         session.add(price)
         latest[item.id] = price
@@ -115,6 +120,7 @@ async def ingest_listings(
                     "price_usd": float(usd),
                     "currency": listing.currency.upper(),
                     "listings_count": count,
+                    "bid_usd": float(bid_usd) if bid_usd is not None else None,
                     "captured_at": when.isoformat(),
                 },
             )
@@ -258,6 +264,27 @@ def _upsert_alias(
         alias.suggested_item_id = suggested.id
 
 
-def _same_quote(previous: Price, usd: Decimal, count: int | None) -> bool:
+def _bid_usd(listing: Listing, rates: dict[str, Decimal]) -> Decimal | None:
+    if listing.bid is None or listing.bid <= 0:
+        return None
+    try:
+        return to_usd(listing.bid, listing.currency, rates)
+    except UnknownCurrencyError:
+        return None
+
+
+def _stored_bid(previous: Price) -> Decimal | None:
+    raw = (previous.details or {}).get("bid_usd")
+    if raw is None:
+        return None
+    return as_decimal(raw).quantize(Decimal("0.0001"))
+
+
+def _same_quote(previous: Price, usd: Decimal, count: int | None, bid_usd: Decimal | None) -> bool:
     previous_usd = as_decimal(previous.price_usd).quantize(Decimal("0.0001"))
-    return previous_usd == usd.quantize(Decimal("0.0001")) and previous.listings_count == count
+    new_bid = bid_usd.quantize(Decimal("0.0001")) if bid_usd is not None else None
+    return (
+        previous_usd == usd.quantize(Decimal("0.0001"))
+        and previous.listings_count == count
+        and _stored_bid(previous) == new_bid
+    )

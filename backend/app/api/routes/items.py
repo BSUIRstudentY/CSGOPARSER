@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_cache, get_current_user, get_db, money
+from app.api.routes.market import demand_usd
 from app.db.models import Item, Price, User
 from app.schemas.common import Page
 from app.schemas.market import ItemOut, OpportunityOut, PricePointOut
@@ -15,6 +16,22 @@ from app.services.cache import PriceCache
 from app.services.opportunities import latest_prices_for_item
 
 router = APIRouter(prefix="/items", tags=["items"])
+
+
+def _bid_usd(row: Price) -> float | None:
+    return demand_usd(row)
+
+
+def _cached_bid(raw: object) -> float | None:
+    if isinstance(raw, bool) or not isinstance(raw, int | float | str):
+        return None
+    try:
+        value = float(raw)
+    except ValueError:
+        return None
+    if value <= 0:
+        return None
+    return value
 
 
 def _item_out(item: Item) -> ItemOut:
@@ -131,6 +148,7 @@ async def price_history(
                 listings_count=row.listings_count,
                 volume_24h=row.volume_24h,
                 captured_at=row.captured_at,
+                bid_usd=_bid_usd(row),
             )
         )
     return points
@@ -157,6 +175,7 @@ async def latest_prices(
                 listings_count=row.get("listings_count"),
                 volume_24h=row.get("volume_24h"),
                 captured_at=row["captured_at"],
+                bid_usd=_cached_bid(row.get("bid_usd")),
             )
             for row in cached
         ]
@@ -170,6 +189,7 @@ async def latest_prices(
             listings_count=row.listings_count,
             volume_24h=row.volume_24h,
             captured_at=row.captured_at,
+            bid_usd=_bid_usd(row),
         )
         for row in rows
     ]
@@ -184,6 +204,7 @@ async def latest_prices(
                 "currency": row.currency,
                 "listings_count": row.listings_count,
                 "volume_24h": row.volume_24h,
+                "bid_usd": _bid_usd(row),
                 "captured_at": row.captured_at.isoformat(),
             },
         )

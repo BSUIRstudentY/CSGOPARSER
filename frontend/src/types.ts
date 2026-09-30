@@ -99,6 +99,7 @@ export type PricePoint = {
   listings_count: number | null;
   volume_24h: number | null;
   captured_at: string;
+  bid_usd: number | null;
 };
 
 export type Item = {

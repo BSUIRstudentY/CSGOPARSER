@@ -57,10 +57,12 @@ export function ItemPage() {
           {card.wear ? ` · ${card.wear}` : ""}
           {card.stattrak ? " · StatTrak" : ""}
           {card.souvenir ? " · Souvenir" : ""}
-          {` · разница ${usd(card.spread_usd)} (${pct(card.spread_pct)})`}
+          {` · разница спроса ${usd(card.spread_usd)} (${pct(card.spread_pct)})`}
         </p>
       </header>
-      <section className="h-72 rounded border border-line bg-panel p-3">
+      <section className="rounded border border-line bg-panel p-3">
+        <p className="mb-2 text-xs uppercase tracking-wide text-muted">История заявок на покупку</p>
+        <div className="h-72">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chart.rows}>
             <CartesianGrid stroke="#2c3544" />
@@ -83,6 +85,7 @@ export function ItemPage() {
             ))}
           </LineChart>
         </ResponsiveContainer>
+        </div>
       </section>
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {card?.quotes.map((quote) => (
@@ -95,7 +98,7 @@ export function ItemPage() {
           >
             <div className="text-xs uppercase text-muted">{quote.site_name}</div>
             <div className="mt-1 font-mono text-lg">{usd(quote.price_usd)}</div>
-            <div className="text-xs text-muted">{quote.listings_count ?? "—"} лотов</div>
+            <div className="text-xs text-muted">лучшая заявка на покупку</div>
             <div className="mt-2 text-sm text-gold">Открыть на площадке</div>
           </a>
         ))}
@@ -108,12 +111,14 @@ function buildChart(
   points: PricePoint[],
   names: Map<string, string>,
 ): { sites: string[]; rows: Array<Record<string, string | number>> } {
-  const sites = [...new Set(points.map((point) => names.get(point.site) ?? point.site))];
+  const bidPoints = points.filter((point) => point.bid_usd != null);
+  const sites = [...new Set(bidPoints.map((point) => names.get(point.site) ?? point.site))];
   const grouped = new Map<string, Record<string, string | number>>();
   for (const point of points) {
     const stamp = new Date(point.captured_at).toLocaleString();
+    if (point.bid_usd == null) continue;
     const row = grouped.get(stamp) ?? { time: stamp };
-    row[names.get(point.site) ?? point.site] = point.price_usd;
+    row[names.get(point.site) ?? point.site] = point.bid_usd;
     grouped.set(stamp, row);
   }
   return { sites, rows: [...grouped.values()] };

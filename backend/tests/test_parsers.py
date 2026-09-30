@@ -113,6 +113,14 @@ async def test_dmarket_requires_keys(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.mark.asyncio
 async def test_waxpeer_thousandths() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/buy-orders/snapshot"):
+            return httpx.Response(
+                200,
+                json={
+                    "success": True,
+                    "offers": [{"name": "Glock-18 | Fade (Factory New)", "max": 240000, "by": "u"}],
+                },
+            )
         return httpx.Response(
             200,
             json={
@@ -124,6 +132,7 @@ async def test_waxpeer_thousandths() -> None:
     async with _client(handler) as client:
         rows = await WaxpeerParser().fetch(_ctx("waxpeer", "https://api.waxpeer.com"), client)
     assert rows[0].price == Decimal("250")
+    assert rows[0].bid == Decimal("240")
     assert rows[0].listings_count == 3
 
 
@@ -157,18 +166,29 @@ async def test_steam_buyer_price_is_cents() -> None:
 @pytest.mark.asyncio
 async def test_market_csgo_price_file() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/v2/prices/class_instance/USD.json"
         return httpx.Response(
             200,
             json={
                 "success": True,
                 "currency": "USD",
-                "items": [
-                    {
+                "items": {
+                    "1_1": {
                         "market_hash_name": "M4A1-S | Printstream (Field-Tested)",
                         "price": "210.5",
-                        "volume": "15",
-                    }
-                ],
+                        "buy_order": "190.25",
+                    },
+                    "1_2": {
+                        "market_hash_name": "M4A1-S | Printstream (Field-Tested)",
+                        "price": "240",
+                        "buy_order": "400",
+                    },
+                    "1_3": {
+                        "market_hash_name": "M4A1-S | Printstream (Field-Tested)",
+                        "price": "211",
+                        "buy_order": "180",
+                    },
+                },
             },
         )
 
@@ -177,7 +197,8 @@ async def test_market_csgo_price_file() -> None:
             _ctx("market_csgo", "https://market.csgo.com"), client
         )
     assert rows[0].price == Decimal("210.5")
-    assert rows[0].volume_24h == 15
+    # 400 sits above the cheapest ask, so it is not the liquid buy order.
+    assert rows[0].bid == Decimal("190.25")
 
 
 def test_aggregate_keeps_cheapest_total_count() -> None:
@@ -185,9 +206,14 @@ def test_aggregate_keeps_cheapest_total_count() -> None:
 
     rows = aggregate_listings(
         [
-            Listing("A", Decimal("3"), "USD", listings_count=2, count_is_total=True),
-            Listing("A", Decimal("2"), "USD", listings_count=5, count_is_total=True),
+            Listing(
+                "A", Decimal("3"), "USD", listings_count=2, count_is_total=True, bid=Decimal("1")
+            ),
+            Listing(
+                "A", Decimal("2"), "USD", listings_count=5, count_is_total=True, bid=Decimal("1.5")
+            ),
         ]
     )
     assert rows[0].price == Decimal("2")
+    assert rows[0].bid == Decimal("1.5")
     assert rows[0].listings_count == 5

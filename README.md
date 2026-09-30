@@ -45,9 +45,9 @@ All five clients call documented public HTTP APIs. None of them bypass Cloudflar
 | --- | --- | --- | --- | --- |
 | `skinport` | `GET /v1/items` (Brotli, 8 requests / 5 min) | 12% | 0 | yes |
 | `dmarket` | Signed `GET /marketplace-api/v2/offers` (`gameId=a8db`, prices in cents, 25 pages) | 7% | 0 | yes |
-| `waxpeer` | `GET /v1/prices?game=csgo` (`1000` = $1) | 2% | 0 | yes |
-| `steam` | Community Market search JSON, `currency=1` | 13.04% of the buyer price | 7 days | no |
-| `market_csgo` | `GET /api/v2/prices/USD.json` | 5% | 7 days | yes |
+| `waxpeer` | `GET /v1/prices` asks and `GET /v1/buy-orders/snapshot` highest bid (`1000` = $1) | 2% | 0 | yes |
+| `steam` | Community Market search JSON, `currency=1`. Asks only; no bulk buy orders | 13.04% of the buyer price | 7 days | no |
+| `market_csgo` | `GET /api/v2/prices/class_instance/USD.json` (`buy_order` is the max bid) | 5% | 7 days | yes |
 
 Buff and CS.MONEY are not included. Buff’s public surface is not a stable official price API, and CS.MONEY does not publish a bulk price feed this client can call without scraping. Add one only if you have a permitted source. See below.
 
@@ -165,7 +165,8 @@ GitHub Actions runs the same checks. Deploy on push to `main` runs only when `DE
 
 ## Assumptions
 
-- Quotes are asks, not bids.
+- The market page compares highest buy orders. Waxpeer and Market.CSGO publish them. Skinport and the Steam search feed do not, so those sites stay out of the comparison. DMarket's `orderBestPrice` needs signed API keys and is not polled yet.
+- Arbitrage still buys the cheapest ask and values the sale at the destination's cheapest ask. That figure is a relist spread, not a filled bid.
 - Flat fees are USD. Percent fees apply to the USD price.
 - FX rates live in `fx_rates` and start as rough placeholders (EUR, GBP, CNY, RUB). Update them with `PUT /admin/fx/{currency}` before trusting a non-USD feed.
 - Opportunities below `ARB_MIN_STORE_PCT` (default `0`) are not stored, so the table stays limited to non-negative spreads.

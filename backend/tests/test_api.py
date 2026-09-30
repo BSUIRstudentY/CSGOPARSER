@@ -87,21 +87,21 @@ async def _prepare(session: AsyncSession) -> None:
     await ingest_listings(
         session,
         sites["dmarket"],
-        [Listing(NAME, Decimal("100"), "USD", listings_count=20)],
+        [Listing(NAME, Decimal("100"), "USD", listings_count=20, bid=Decimal("70"))],
         rates,
     )
     sites = {row.slug: row for row in (await session.execute(select(Site))).scalars().all()}
     await ingest_listings(
         session,
         sites["skinport"],
-        [Listing(NAME, Decimal("150"), "USD", listings_count=11)],
+        [Listing(NAME, Decimal("150"), "USD", listings_count=11, bid=Decimal("140"))],
         rates,
     )
     sites = {row.slug: row for row in (await session.execute(select(Site))).scalars().all()}
     await ingest_listings(
         session,
         sites["steam"],
-        [Listing(NAME, Decimal("120"), "USD", listings_count=30)],
+        [Listing(NAME, Decimal("120"), "USD", listings_count=30, bid=Decimal("90"))],
         rates,
     )
     await recompute_opportunities(session, Decimal("0"))
@@ -157,16 +157,47 @@ async def test_buy_low_sell_high_after_fees(client: AsyncClient) -> None:
 async def test_market_ranks_by_price_gap(client: AsyncClient) -> None:
     async with app.state.session_factory() as session:
         await _prepare(session)
+    async with app.state.session_factory() as session:
+        session.add(
+            Site(
+                slug="waxpeer",
+                name="Waxpeer",
+                base_url="https://api.waxpeer.com",
+                currency="USD",
+                buy_fee_pct=Decimal("0"),
+                sell_fee_pct=Decimal("0"),
+                deposit_fee_pct=Decimal("0"),
+                deposit_fee_flat=Decimal("0"),
+                withdraw_fee_pct=Decimal("0"),
+                withdraw_fee_flat=Decimal("0"),
+                trade_lock_days=0,
+                cash_out=True,
+                enabled=True,
+                tos_restricted=False,
+                payment_methods=["balance"],
+                config={},
+            )
+        )
+        await session.commit()
+        sites = {row.slug: row for row in (await session.execute(select(Site))).scalars().all()}
+        await ingest_listings(
+            session,
+            sites["waxpeer"],
+            [Listing(NAME, Decimal("80"), "USD", listings_count=4)],
+            {"USD": Decimal("1")},
+        )
     headers = await auth_header(client, "market@localhost")
     response = await client.get("/market", headers=headers, params={"q": "Redline"})
     assert response.status_code == 200, response.text
     card = response.json()["items"][0]
+    # Cards compare buy orders (70 / 90 / 140), not the cheapest listings (100 / 120 / 150).
     assert card["cheapest"]["site"] == "dmarket"
-    assert card["cheapest"]["price_usd"] == pytest.approx(100)
+    assert card["cheapest"]["price_usd"] == pytest.approx(70)
     assert card["highest"]["site"] == "skinport"
-    assert card["highest"]["price_usd"] == pytest.approx(150)
-    assert card["spread_usd"] == pytest.approx(50)
+    assert card["highest"]["price_usd"] == pytest.approx(140)
+    assert card["spread_usd"] == pytest.approx(70)
     assert card["cheapest"]["url"].startswith("https://dmarket.com/")
+    assert "waxpeer" not in {quote["site"] for quote in card["quotes"]}
     steam = next(quote for quote in card["quotes"] if quote["site"] == "steam")
     assert steam["url"].startswith("https://steamcommunity.com/market/listings/730/")
 
