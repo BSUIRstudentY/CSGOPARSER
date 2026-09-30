@@ -1,0 +1,89 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: csgobot
+      POSTGRES_PASSWORD: csgobot
+      POSTGRES_DB: csgobot
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U csgobot -d csgobot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://csgobot:csgobot@db:5432/csgobot
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:-dev-change-me}
+      PARSER_MODE: ${PARSER_MODE:-demo}
+      POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-300}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@localhost}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-changeme}
+      SEED_DEMO_USER: "true"
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
+      ARB_MIN_STORE_PCT: ${ARB_MIN_STORE_PCT:-0}
+      CORS_ORIGINS: http://localhost:3000
+      LOG_LEVEL: INFO
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  worker:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://csgobot:csgobot@db:5432/csgobot
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:-dev-change-me}
+      PARSER_MODE: ${PARSER_MODE:-demo}
+      POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-300}
+      ARB_MIN_STORE_PCT: ${ARB_MIN_STORE_PCT:-0}
+      LOG_LEVEL: INFO
+    entrypoint: ["python", "-m", "app.worker"]
+    depends_on:
+      api:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE: /api
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
